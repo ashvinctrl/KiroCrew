@@ -1766,6 +1766,21 @@ The dashboard port is set with the KIROCREW_PORT env var, not a config key.
 
         register_process_start_override_attestation()
 
+    # The live target (Dev Fleet "Make live") is a pointer file, not an edit to
+    # this process's service definition — so it is resolved HERE, by the process
+    # itself. This must stay the FIRST thing the gateway does after argv is
+    # known: the gateway lock is not held yet and no socket is bound, so exec'ing
+    # away leaves nothing half-done. It returns (and we boot the installed build)
+    # whenever there is no usable target, so a bad pointer can never leave the
+    # host with no gateway. Gateway only: a plain CLI invocation must keep running
+    # the install the user typed, not a worktree someone made live.
+    if args.command == "gateway":
+        # Imported here rather than at module top so a non-gateway CLI
+        # invocation does not pay for the service package.
+        from kiro_crew.service.live_target import maybe_reexec
+
+        maybe_reexec(sys.argv[1:])
+
     # ``gateway --seed <fixture>`` populates $KIROCREW_HOME from a hand-authored
     # fixture BEFORE the gateway starts — lets a dev spin up a pre-populated
     # server in one command. We run the seed here (post parse_args, but BEFORE
